@@ -4,9 +4,17 @@ import time
 import numpy as np
 import pygame
 import os
+import sys
 
-VIDEO_PATH = "raahh_fixed.mp4"
-AUDIO_PATH = "raahh_audio.mp3"
+def resource_path(relative_path):
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
+
+VIDEO_PATH = resource_path("raahh_fixed.mp4")
+AUDIO_PATH = resource_path("raahh_audio.mp3")
 SECOND_LIMIT = 1
 SCALE = 0.25   
 
