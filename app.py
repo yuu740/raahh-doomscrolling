@@ -4,50 +4,69 @@ import face_recognition
 import time
 import numpy as np
 
-
 start_time = None
-limit = 10  # Detik
+limit = 3
+alarm_cap = None
+video_path = "raahh_fixed.mp4"
+frame_count = 0  
 
 def detect_doomscroll(image):
-    global start_time
+    global start_time, alarm_cap, frame_count
     
     if image is None:
         return None
 
-    small_frame = cv2.resize(image, (0, 0), fx=0.25, fy=0.25)
-    
-    face_locations = face_recognition.face_locations(small_frame)
+    image = image.copy()
+    frame_count += 1
 
-    if len(face_locations) > 0:
-        if start_time is None:
-            start_time = time.time()
+    if frame_count % 3 == 0:
+        small_frame = cv2.resize(image, (0, 0), fx=0.1, fy=0.1)
+        face_landmarks_list = face_recognition.face_landmarks(small_frame)
         
+        eyes_detected = False
+        if len(face_landmarks_list) > 0:
+            landmarks = face_landmarks_list[0]
+            if 'left_eye' in landmarks and 'right_eye' in landmarks:
+                eyes_detected = True
+
+        if eyes_detected:
+            if start_time is None:
+                start_time = time.time()    
+        else:
+            start_time = None
+            if alarm_cap is not None:
+                alarm_cap.release()
+                alarm_cap = None
+
+    if start_time is not None:
         elapsed = time.time() - start_time
         
         if elapsed > limit:
-            overlay = image.copy()
-            cv2.rectangle(overlay, (0,0), (image.shape[1], image.shape[0]), (0,0,255), -1)
-            image = cv2.addWeighted(overlay, 0.5, image, 0.5, 0)
+            if alarm_cap is None:
+                alarm_cap = cv2.VideoCapture(video_path)
             
-            cv2.putText(image, "STOP DOOMSCROLLING!", (50, image.shape[0]//2), 
-                        cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 255, 255), 4)
+            ret, frame_alarm = alarm_cap.read()
+            if not ret:
+                alarm_cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                ret, frame_alarm = alarm_cap.read()
+                
+            if ret and frame_alarm is not None:
+                frame_alarm = cv2.resize(frame_alarm, (image.shape[1], image.shape[0]))
+                return cv2.cvtColor(frame_alarm, cv2.COLOR_BGR2RGB)
         else:
-            countdown = int(limit - elapsed)
-            cv2.putText(image, f"Sisa waktu: {countdown}s", (20, 40), 
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
-    else:
-        start_time = None
-        
+            countdown = round(limit - elapsed, 1)
+            cv2.putText(image, f"Mata terdeteksi! Alarm dlm: {countdown}s", (20, 50), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 3)
+    
     return image
 
-demo = gr.Interface(
-    fn=detect_doomscroll,
-    inputs=gr.Image(sources=["webcam"], streaming=True),
-    outputs="image",
-    live=True,
-    title="Doomscroll Blocker (Dlib Version)",
-    description="Dekatkan wajah ke kamera. Jika lebih dari 10 detik, alarm merah akan muncul."
-)
+with gr.Blocks(title="Anti-Doomscroll AI") as demo:
+    gr.Markdown("# Doomscroll Blocker")
+    with gr.Row():
+        webcam_input = gr.Image(sources=["webcam"], streaming=True, label="Webcam")
+        output_screen = gr.Image(label="Monitoring Screen")
+
+    webcam_input.stream(fn=detect_doomscroll, inputs=webcam_input, outputs=output_screen, time_limit=15)
 
 if __name__ == "__main__":
     demo.launch()
