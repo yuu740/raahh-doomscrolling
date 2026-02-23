@@ -3,3 +3,4 @@ build/
 dist/
 *.spec
 build_app.sh
+*.xml
